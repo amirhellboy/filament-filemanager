@@ -308,7 +308,13 @@
         const data = (typeof payload === 'string') ? {url: payload} : (payload || {});
         // Check if opened from Filament (popup)
         if (window.opener && window.opener.__fileManagerSelectCallback) {
-            window.opener.__fileManagerSelectCallback(data);
+            try {
+                window.opener.__fileManagerSelectCallback(data);
+            } catch (_) {}
+            // Also try postMessage to opener for robustness
+            try {
+                window.opener.postMessage({ fileManagerSelected: data }, '*');
+            } catch (_) {}
             window.close();
             return;
         }

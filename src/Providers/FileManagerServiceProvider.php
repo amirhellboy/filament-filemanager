@@ -17,13 +17,13 @@ class FileManagerServiceProvider extends PackageServiceProvider
     {
         $package->name('filament-filemanager')
             ->hasConfigFile()
-            ->hasViews()
+            //->hasViews()
             ->hasInstallCommand(
                 function (InstallCommand $command) {
                     $command
                         ->publishConfigFile()
-                        ->copyAndRegisterServiceProviderInApp();
-                    //->askToStarRepoOnGitHub($this->getAssetPackageName());
+                        ->copyAndRegisterServiceProviderInApp()
+                        ->askToStarRepoOnGitHub($this->getAssetPackageName());
                 }
             );
     }
