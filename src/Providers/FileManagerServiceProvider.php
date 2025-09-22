@@ -3,10 +3,6 @@
 namespace Amirhellboy\FilamentFileManager\Providers;
 
 use Amirhellboy\FilamentFileManager\Http\Middleware\AccessPanelPermission;
-use Amirhellboy\FilamentTinymceEditor\Tiny;
-use App\Models\Permission;
-use Filament\Support\Assets\Js;
-use Filament\Support\Facades\FilamentAsset;
 use Spatie\LaravelPackageTools\Commands\InstallCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
