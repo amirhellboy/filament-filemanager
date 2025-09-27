@@ -21,7 +21,29 @@
         <div id="file-preview-{{ $getId() }}" style="margin-bottom:1rem;width:100%"></div>
         <button id="browse-btn-{{ $getId() }}" type="button" class="drag-drop-zone w-full"
                 style="width:100%;display:flex;align-items:center;justify-content:center;padding:2rem;font-size:1.2rem;"
-                onclick="window.openFileManagerPicker_{{ $jsId }}()"
+                onclick="(function() { 
+                    const func = window.openFileManagerPicker_{{ $jsId }} || window['openFileManagerPicker_{{ $jsId }}']; 
+                    if (func) { 
+                        func(); 
+                    } else { 
+                        // Try to create the function on the fly
+                        window.openFileManagerPicker_{{ $jsId }} = function () {
+                            windowOpenFileManagerModal_{{ $jsId }}(function (selected) {
+                                var inputEl = document.getElementById('{{ $getId() }}');
+                                var mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
+                                var value = mode === 'url' ? (selected.url || selected.path || selected) : (selected.path || selected.url || selected);
+                                inputEl.value = value;
+                                inputEl.dispatchEvent(new Event('input', {bubbles: true}));
+                                inputEl.dispatchEvent(new Event('change', {bubbles: true}));
+                                setTimeout(function () {
+                                    showFilePreview_{{ $jsId }}(value);
+                                }, 0);
+                                window.__lastFileManagerPayload = selected;
+                            });
+                        };
+                        window.openFileManagerPicker_{{ $jsId }}();
+                    } 
+                })()"
                 @if($isDisabled()) disabled style="opacity:0.7;cursor:not-allowed;" @endif
         >
             @if(app()->getLocale() == "fa")
@@ -108,10 +130,21 @@
     function windowOpenFileManagerModal_{{ $jsId }}(onSelect) {
         const url = `{{ route("filament-filemanager.file-manager") }}`;
         const win = window.open(url, 'FileManager', 'width=900,height=600');
+        
+        // Store the callback in a unique way
+        const callbackId = '{{ $jsId }}';
         window.__fileManagerSelectCallback = (value) => {
-            onSelect(value);
-            win.close();
+            // Check if this callback is for the current component
+            if (window.__currentFileManagerComponent === callbackId) {
+                onSelect(value);
+                win.close();
+                // Clean up
+                delete window.__currentFileManagerComponent;
+            }
         };
+        
+        // Set the current component ID
+        window.__currentFileManagerComponent = callbackId;
     }
 
     window.showFilePreview_{{ $jsId }} = function (fileValue) {
@@ -168,7 +201,8 @@
         if (browseBtn) browseBtn.style.display = '';
     }
 
-    window.openFileManagerPicker_{{ $jsId }} = function () {
+    // Define the function with multiple approaches
+    function openFileManagerPicker_{{ $jsId }}() {
         windowOpenFileManagerModal_{{ $jsId }}(function (selected) {
             var inputEl = document.getElementById('{{ $getId() }}');
             var mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
@@ -181,7 +215,13 @@
             }, 0);
             window.__lastFileManagerPayload = selected;
         });
-    };
+    }
+
+    // Assign to window object
+    window.openFileManagerPicker_{{ $jsId }} = openFileManagerPicker_{{ $jsId }};
+    
+    // Also assign with bracket notation
+    window['openFileManagerPicker_{{ $jsId }}'] = openFileManagerPicker_{{ $jsId }};
 
     document.addEventListener('DOMContentLoaded', function () {
         var inputEl = document.getElementById('{{ $getId() }}');
@@ -203,19 +243,23 @@
         }
         if (!payload) return;
         
+        // Check if this message is for this specific component
         var inputEl = document.getElementById('{{ $getId() }}');
         if (!inputEl) return;
         
-        var mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
-        var value = mode === 'url' ? (payload.url || payload.path || '') : (payload.path || payload.url || '');
-        
-        inputEl.value = value;
-        inputEl.dispatchEvent(new Event('input', {bubbles: true}));
-        inputEl.dispatchEvent(new Event('change', {bubbles: true}));
-        setTimeout(function () {
-            showFilePreview_{{ $jsId }}(value);
-        }, 0);
-        window.__lastFileManagerPayload = payload;
+        // Only process if this is the active component
+        if (window.__currentFileManagerComponent === '{{ $jsId }}') {
+            var mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
+            var value = mode === 'url' ? (payload.url || payload.path || '') : (payload.path || payload.url || '');
+            
+            inputEl.value = value;
+            inputEl.dispatchEvent(new Event('input', {bubbles: true}));
+            inputEl.dispatchEvent(new Event('change', {bubbles: true}));
+            setTimeout(function () {
+                showFilePreview_{{ $jsId }}(value);
+            }, 0);
+            window.__lastFileManagerPayload = payload;
+        }
     });
 
     // Livewire integration
@@ -242,7 +286,11 @@
         }
     });
 
-    // Handle conditional visibility - re-initialize when field becomes visible
+    // Ensure function is available globally (redundant but safe)
+    window['openFileManagerPicker_{{ $jsId }}'] = window.openFileManagerPicker_{{ $jsId }};
+    
+
+    // Handle conditional visibility and multiple fields
     const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
             if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
@@ -265,6 +313,8 @@
                                 window.__lastFileManagerPayload = selected;
                             });
                         };
+                        // Also set it globally
+                        window['openFileManagerPicker_{{ $jsId }}'] = window.openFileManagerPicker_{{ $jsId }};
                     }
                 }
             }
@@ -278,5 +328,144 @@
             observer.observe(button, { attributes: true, attributeFilter: ['style'] });
         }
     });
+
+    // Global function to re-initialize all FileManagerPicker functions
+    if (!window.__reinitializeFileManagerPickers) {
+        window.__reinitializeFileManagerPickers = function() {
+            const allButtons = document.querySelectorAll('[id^="browse-btn-"]');
+            
+            allButtons.forEach(button => {
+                const fieldId = button.id.replace('browse-btn-', '');
+                const jsId = fieldId.replace(/[.\[\]-]/g, '_');
+                const functionName = 'openFileManagerPicker_' + jsId;
+                
+                if (typeof window[functionName] !== 'function') {
+                    // Try to find the function in the global scope
+                    const globalFunction = window['openFileManagerPicker_' + jsId];
+                    if (globalFunction) {
+                        window[functionName] = globalFunction;
+                    } else {
+                        // Create the missing function dynamically
+                        window[functionName] = function() {
+                            // Create modal function if it doesn't exist
+                            const modalFunctionName = 'windowOpenFileManagerModal_' + jsId;
+                            if (typeof window[modalFunctionName] !== 'function') {
+                                window[modalFunctionName] = function(onSelect) {
+                                    const url = `{{ route("filament-filemanager.file-manager") }}`;
+                                    const win = window.open(url, 'FileManager', 'width=900,height=600');
+                                    
+                                    // Store the callback in a unique way
+                                    const callbackId = jsId;
+                                    window.__fileManagerSelectCallback = (value) => {
+                                        // Check if this callback is for the current component
+                                        if (window.__currentFileManagerComponent === callbackId) {
+                                            onSelect(value);
+                                            win.close();
+                                            // Clean up
+                                            delete window.__currentFileManagerComponent;
+                                        }
+                                    };
+                                    
+                                    // Set the current component ID
+                                    window.__currentFileManagerComponent = callbackId;
+                                };
+                            }
+                            
+                            // Create preview function if it doesn't exist
+                            const previewFunctionName = 'showFilePreview_' + jsId;
+                            if (typeof window[previewFunctionName] !== 'function') {
+                                window[previewFunctionName] = function(fileValue) {
+                                    const previewEl = document.getElementById('file-preview-' + fieldId);
+                                    const browseBtn = document.getElementById('browse-btn-' + fieldId);
+                                    if (!fileValue) {
+                                        if (previewEl) previewEl.innerHTML = '';
+                                        if (browseBtn) browseBtn.style.display = '';
+                                        return;
+                                    }
+                                    
+                                    const isLikelyUrl = /^https?:\/\//i.test(fileValue) || fileValue.startsWith('/') || fileValue.startsWith('blob:');
+                                    const url = isLikelyUrl ? fileValue : ('/filament-filemanager/file-preview/' + window.__ffm_base64url(fileValue));
+                                    const fileName = fileValue.split('/').pop();
+                                    const ext = fileValue.split('.').pop().toLowerCase();
+                                    const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+                                    
+                                    let body = '';
+                                    if (imgExts.includes(ext)) {
+                                        body = '<img src="' + url + '" style="display:block;margin:0 auto;max-width:100%;max-height:210px;">';
+                                    } else {
+                                        body = '<div style="padding:2rem;text-align:center;color:#888;">Previewing this file is not supported.</div>';
+                                    }
+                                    
+                                    const previewContent = '<div style="background:#222;border-radius:16px;box-shadow:0 4px 16px #0002;overflow:hidden;max-width:100%;position:relative;">' + 
+                                        '<div style="background:linear-gradient(90deg,#1fa463,#1fa463 60%,#222 100%);color:#fff;padding:8px 16px 4px 8px;border-top-left-radius:14px;border-top-right-radius:14px;display:flex;align-items:center;justify-content:space-between;position:relative;">' +
+                                        '<div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">' + fileName + '</div>' +
+                                        '<button type="button" onclick="window.removeFilePreview_' + jsId + '()" style="background:none;border:none;top:0;right:14px;font-size:22px;color:#fff;cursor:pointer;">&times;</button>' +
+                                        '</div>' +
+                                        '<div style="padding:16px;">' + body + '</div>' +
+                                        '</div>';
+                                    
+                                    if (previewEl) previewEl.innerHTML = previewContent;
+                                    if (browseBtn) browseBtn.style.display = 'none';
+                                };
+                            }
+                            
+                            // Create remove function if it doesn't exist
+                            const removeFunctionName = 'removeFilePreview_' + jsId;
+                            if (typeof window[removeFunctionName] !== 'function') {
+                                window[removeFunctionName] = function() {
+                                    const inputEl = document.getElementById(fieldId);
+                                    if (inputEl) {
+                                        inputEl.value = '';
+                                        inputEl.dispatchEvent(new Event('input', {bubbles: true}));
+                                        inputEl.dispatchEvent(new Event('change', {bubbles: true}));
+                                    }
+                                    const previewEl = document.getElementById('file-preview-' + fieldId);
+                                    if (previewEl) previewEl.innerHTML = '';
+                                    const browseBtn = document.getElementById('browse-btn-' + fieldId);
+                                    if (browseBtn) browseBtn.style.display = '';
+                                };
+                            }
+                            
+                            // Call the modal function
+                            window[modalFunctionName](function (selected) {
+                                const inputEl = document.getElementById(fieldId);
+                                if (inputEl) {
+                                    const mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
+                                    const value = mode === 'url' ? (selected.url || selected.path || selected) : (selected.path || selected.url || selected);
+                                    inputEl.value = value;
+                                    inputEl.dispatchEvent(new Event('input', {bubbles: true}));
+                                    inputEl.dispatchEvent(new Event('change', {bubbles: true}));
+                                    setTimeout(function () {
+                                        window[previewFunctionName](value);
+                                    }, 0);
+                                    window.__lastFileManagerPayload = selected;
+                                }
+                            });
+                        };
+                    }
+                }
+            });
+        };
+    }
+
+    // Call re-initialization on various events
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(window.__reinitializeFileManagerPickers, 100);
+    });
+    document.addEventListener('livewire:navigated', function() {
+        setTimeout(window.__reinitializeFileManagerPickers, 100);
+    });
+    document.addEventListener('filament:navigated', function() {
+        setTimeout(window.__reinitializeFileManagerPickers, 100);
+    });
+
+    // Also call it after a short delay to ensure all components are loaded
+    setTimeout(window.__reinitializeFileManagerPickers, 500);
+    
+    // Additional delay for complex forms
+    setTimeout(window.__reinitializeFileManagerPickers, 1000);
+    
+    // Force re-initialization after a longer delay
+    setTimeout(window.__reinitializeFileManagerPickers, 2000);
 </script>
 @endscript
