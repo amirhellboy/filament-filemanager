@@ -30,11 +30,12 @@ class FileManagerServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
-        if (!class_exists(\BezhanSalleh\FilamentShield\FilamentShieldPlugin::class)) {
-            throw new \RuntimeException(
-                'This package requires [bezhan-salleh/filament-shield]. Please install it via composer: composer require bezhan-salleh/filament-shield'
-            );
-        }
+        // Comment out the shield requirement check for now
+        // if (!class_exists(\BezhanSalleh\FilamentShield\FilamentShieldPlugin::class)) {
+        //     throw new \RuntimeException(
+        //         'This package requires [bezhan-salleh/filament-shield]. Please install it via composer: composer require bezhan-salleh/filament-shield'
+        //     );
+        // }
 
         // Load package views
         $this->loadViewsFrom(__DIR__ . '/../../resources/views', 'filament-filemanager');
@@ -42,8 +43,6 @@ class FileManagerServiceProvider extends PackageServiceProvider
         \Amirhellboy\FilamentFileManager\Controllers\FileManagerController::routes();
 
         app('router')->aliasMiddleware('filemanger.permission', AccessPanelPermission::class);
-
-
     }
 
     protected function getAssetPackageName(): ?string

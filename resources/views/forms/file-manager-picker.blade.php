@@ -6,7 +6,14 @@
         $jsId = str_replace(['.', '[', ']','-'], '_', $getId());
     @endphp
     <div
-        x-data="{ init() { const el = document.getElementById('{{ $getId() }}'); if (el && el.value) { window.showFilePreview_{{ $jsId }}(el.value); } } }"
+        x-data="{ 
+            init() { 
+                const el = document.getElementById('{{ $getId() }}'); 
+                if (el && el.value) { 
+                    window.showFilePreview_{{ $jsId }}(el.value); 
+                }
+            }
+        }"
         x-init="init()"
         x-on:filament:navigated.window="init()"
         x-on:livewire:navigated.window="init()"
@@ -117,10 +124,6 @@
         }
         var isLikelyUrl = /^https?:\/\//i.test(fileValue) || fileValue.startsWith('/') || fileValue.startsWith('blob:');
         var url = isLikelyUrl ? fileValue : ('/filament-filemanager/file-preview/' + window.__ffm_base64url(fileValue));
-        try {
-            console.debug('[FFM] preview value:', fileValue, '-> url:', url);
-        } catch (e) {
-        }
         var fileName = fileValue.split('/').pop();
         var ext = fileValue.split('.').pop().toLowerCase();
         var imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
@@ -170,10 +173,6 @@
             var inputEl = document.getElementById('{{ $getId() }}');
             var mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
             var value = mode === 'url' ? (selected.url || selected.path || selected) : (selected.path || selected.url || selected);
-            try {
-                console.debug('[FFM] opener callback selected:', selected, 'mode:', mode, 'value:', value);
-            } catch (e) {
-            }
             inputEl.value = value;
             inputEl.dispatchEvent(new Event('input', {bubbles: true}));
             inputEl.dispatchEvent(new Event('change', {bubbles: true}));
@@ -191,91 +190,35 @@
         }
     });
 
-    // Robust initializer to handle edit forms where value comes from database
-    (function () {
-        var attempts = 0;
-        var maxAttempts = 50; // up to ~5s
-        var mo; // mutation observer
-        function initOnce() {
-            var inputEl = document.getElementById('{{ $getId() }}');
-            if (inputEl && inputEl.value) {
-                try {
-                    console.debug('[FFM] init preview value:', inputEl.value);
-                } catch (e) {
-                }
-                showFilePreview_{{ $jsId }}(inputEl.value);
-                if (mo) {
-                    try {
-                        mo.disconnect();
-                    } catch (e) {
-                    }
-                }
-                return true;
-            }
-            return false;
-        }
-
-        function retryInit() {
-            if (initOnce()) return;
-            if (attempts++ < maxAttempts) setTimeout(retryInit, 100);
-        }
-
-        // kick off retries shortly after mount
-        setTimeout(retryInit, 50);
-        // also try on visibility change (some SPA navigations)
-        document.addEventListener('visibilitychange', function () {
-            if (!document.hidden) retryInit();
-        });
-        // Filament panel navigation hook
-        window.addEventListener('filament:navigated', retryInit);
-        // Alpine init (components may mount after navigate)
-        document.addEventListener('alpine:initialized', retryInit);
-
-        // Observe DOM changes to catch Livewire/Filament re-renders
-        try {
-            var lastRun = 0;
-            mo = new MutationObserver(function () {
-                var now = Date.now();
-                if (now - lastRun < 100) return;
-                lastRun = now;
-                initOnce();
-            });
-            mo.observe(document.body, {childList: true, subtree: true});
-        } catch (e) {
-        }
-    })();
-
-    // Fallback: handle selection via postMessage from popup/iframe
+    // Handle selection via postMessage from popup/iframe
     window.addEventListener('message', function (event) {
-        try {
-            var data = event && event.data ? event.data : null;
-            if (!data) return;
-            var payload = null;
-            if (data.fileManagerSelected) {
-                payload = data.fileManagerSelected;
-            } else if (data.mceAction === 'fileSelected') {
-                payload = {url: data.url};
-            }
-            if (!payload) return;
-            var inputEl = document.getElementById('{{ $getId() }}');
-            if (!inputEl) return;
-            var mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
-            var value = mode === 'url' ? (payload.url || payload.path || '') : (payload.path || payload.url || '');
-            try {
-                console.debug('[FFM] postMessage payload:', payload, 'mode:', mode, 'value:', value);
-            } catch (e) {
-            }
-            inputEl.value = value;
-            inputEl.dispatchEvent(new Event('input', {bubbles: true}));
-            inputEl.dispatchEvent(new Event('change', {bubbles: true}));
-            setTimeout(function () {
-                showFilePreview_{{ $jsId }}(value);
-            }, 0);
-            window.__lastFileManagerPayload = payload;
-        } catch (e) {
+        var data = event && event.data ? event.data : null;
+        if (!data) return;
+        
+        var payload = null;
+        if (data.fileManagerSelected) {
+            payload = data.fileManagerSelected;
+        } else if (data.mceAction === 'fileSelected') {
+            payload = {url: data.url};
         }
+        if (!payload) return;
+        
+        var inputEl = document.getElementById('{{ $getId() }}');
+        if (!inputEl) return;
+        
+        var mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
+        var value = mode === 'url' ? (payload.url || payload.path || '') : (payload.path || payload.url || '');
+        
+        inputEl.value = value;
+        inputEl.dispatchEvent(new Event('input', {bubbles: true}));
+        inputEl.dispatchEvent(new Event('change', {bubbles: true}));
+        setTimeout(function () {
+            showFilePreview_{{ $jsId }}(value);
+        }, 0);
+        window.__lastFileManagerPayload = payload;
     });
 
+    // Livewire integration
     document.addEventListener("livewire:initialized", function () {
         if (window.Livewire) {
             Livewire.hook('commit', ({component, succeed}) => {
@@ -296,6 +239,43 @@
         var inputEl = document.getElementById('{{ $getId() }}');
         if (inputEl && inputEl.value) {
             showFilePreview_{{ $jsId }}(inputEl.value);
+        }
+    });
+
+    // Handle conditional visibility - re-initialize when field becomes visible
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                const target = mutation.target;
+                if (target.id === 'browse-btn-{{ $getId() }}') {
+                    const isVisible = target.offsetParent !== null;
+                    if (isVisible && typeof window.openFileManagerPicker_{{ $jsId }} !== 'function') {
+                        // Re-define the function if it's missing
+                        window.openFileManagerPicker_{{ $jsId }} = function () {
+                            windowOpenFileManagerModal_{{ $jsId }}(function (selected) {
+                                var inputEl = document.getElementById('{{ $getId() }}');
+                                var mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
+                                var value = mode === 'url' ? (selected.url || selected.path || selected) : (selected.path || selected.url || selected);
+                                inputEl.value = value;
+                                inputEl.dispatchEvent(new Event('input', {bubbles: true}));
+                                inputEl.dispatchEvent(new Event('change', {bubbles: true}));
+                                setTimeout(function () {
+                                    showFilePreview_{{ $jsId }}(value);
+                                }, 0);
+                                window.__lastFileManagerPayload = selected;
+                            });
+                        };
+                    }
+                }
+            }
+        });
+    });
+
+    // Start observing when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        const button = document.getElementById('browse-btn-{{ $getId() }}');
+        if (button) {
+            observer.observe(button, { attributes: true, attributeFilter: ['style'] });
         }
     });
 </script>

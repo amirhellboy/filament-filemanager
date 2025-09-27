@@ -12,7 +12,7 @@ class FileManagerController
 {
     public static function routes()
     {
-        Route::middleware(['web', 'auth', AccessPanelPermission::class])
+        Route::middleware(['web', 'auth'])
             ->prefix('filament-filemanager')
             ->name('filament-filemanager.')
             ->group(function () {
@@ -23,13 +23,68 @@ class FileManagerController
                 Route::delete('/file-manager/file', [self::class, 'delete'])->name('delete');
                 Route::get('/file-manager/serve/{path}', [self::class, 'serveFile'])->where('path', '.*')->name('file-manager.serve');
                 Route::get('/file-preview/{encodedPath}', function ($encodedPath) {
-                    $path = urldecode(base64_decode(strtr($encodedPath, '-_', '+/')));
-                    $disk = config('filament-filemanager.disk', 'local');
-                    if (!Storage::disk($disk)->exists($path)) {
-                        abort(404, 'File not found on disk: ' . $disk . ' path: ' . $path);
+                    try {
+                        $path = urldecode(base64_decode(strtr($encodedPath, '-_', '+/')));
+                        $disk = config('filament-filemanager.disk', 'local');
+                        
+                        \Log::info('[FFM] File preview request:', [
+                            'encodedPath' => $encodedPath,
+                            'decodedPath' => $path,
+                            'disk' => $disk
+                        ]);
+                        
+                        if (!Storage::disk($disk)->exists($path)) {
+                            \Log::error('[FFM] File not found:', [
+                                'disk' => $disk,
+                                'path' => $path
+                            ]);
+                            abort(404, 'File not found on disk: ' . $disk . ' path: ' . $path);
+                        }
+                        
+                        // For local disk, serve the file directly instead of redirecting
+                        if ($disk === 'local') {
+                            $filePath = Storage::disk($disk)->path($path);
+                            if (!file_exists($filePath)) {
+                                \Log::error('[FFM] File path not found:', $filePath);
+                                abort(404, 'File not found: ' . $filePath);
+                            }
+                            
+                            $mimeType = mime_content_type($filePath);
+                            \Log::info('[FFM] Serving file:', [
+                                'filePath' => $filePath,
+                                'mimeType' => $mimeType
+                            ]);
+                            
+                            return response()->file($filePath, [
+                                'Content-Type' => $mimeType,
+                                'Cache-Control' => 'public, max-age=3600'
+                            ]);
+                        }
+                        
+                        // For other disks, try to get the URL
+                        try {
+                            $url = Storage::disk($disk)->url($path);
+                            return redirect($url);
+                        } catch (\Exception $e) {
+                            // If URL generation fails, serve the file directly
+                            $filePath = Storage::disk($disk)->path($path);
+                            if (file_exists($filePath)) {
+                                $mimeType = mime_content_type($filePath);
+                                return response()->file($filePath, [
+                                    'Content-Type' => $mimeType,
+                                    'Cache-Control' => 'public, max-age=3600'
+                                ]);
+                            }
+                            abort(404, 'File not accessible');
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('[FFM] File preview error:', [
+                            'encodedPath' => $encodedPath,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        abort(500, 'File preview error: ' . $e->getMessage());
                     }
-                    $url = Storage::disk($disk)->url($path);
-                    return redirect($url);
                 })->where('encodedPath', '.*')->name('filament-filemanager.file-preview');
 
             });

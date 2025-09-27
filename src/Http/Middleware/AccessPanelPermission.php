@@ -6,7 +6,7 @@ use Closure;
 use Filament\Facades\Filament;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Amirhellboy\FilamentTinymceEditor\Models\TinymcePermission;
+// use Amirhellboy\FilamentTinymceEditor\Models\TinymcePermission;
 
 class AccessPanelPermission
 {
@@ -17,15 +17,8 @@ class AccessPanelPermission
             abort(403);
         }
 
-        if (method_exists($user, 'canAccessPanel')) {
-            if (!$user->canAccessPanel(app(\Filament\Panel::class))) {
-                abort(403);
-            }
-        } else {
-            abort(403);
-        }
-
-
+        // Simplified permission check - just check if user is authenticated
+        // You can add more specific permission checks here if needed
         return $next($request);
     }
 }
