@@ -10,7 +10,15 @@
             init() { 
                 const el = document.getElementById('{{ $getId() }}'); 
                 if (el && el.value) { 
-                    window.showFilePreview_{{ $jsId }}(el.value); 
+                    // Wait for the function to be available
+                    const checkFunction = () => {
+                        if (typeof window.showFilePreview_{{ $jsId }} === 'function') {
+                            window.showFilePreview_{{ $jsId }}(el.value);
+                        } else {
+                            setTimeout(checkFunction, 10);
+                        }
+                    };
+                    checkFunction();
                 }
             }
         }"
@@ -136,8 +144,8 @@
         window.__fileManagerSelectCallback = (value) => {
             // Check if this callback is for the current component
             if (window.__currentFileManagerComponent === callbackId) {
-                onSelect(value);
-                win.close();
+            onSelect(value);
+            win.close();
                 // Clean up
                 delete window.__currentFileManagerComponent;
             }
@@ -150,6 +158,7 @@
     window.showFilePreview_{{ $jsId }} = function (fileValue) {
         var previewEl = document.getElementById('file-preview-{{ $getId() }}');
         var browseBtn = document.getElementById('browse-btn-{{ $getId() }}');
+        
         if (!fileValue) {
             previewEl.innerHTML = '';
             if (browseBtn) browseBtn.style.display = '';
@@ -164,8 +173,10 @@
         var audioExts = ['mp3', 'wav', 'ogg', 'aac'];
         var previewContent = '';
         var fileSize = '';
-        if (window.__lastFileManagerPayload && window.__lastFileManagerPayload.size) {
-            var size = window.__lastFileManagerPayload.size;
+        // Use component-specific payload instead of global one
+        var componentPayload = window['__lastFileManagerPayload_{{ $jsId }}'];
+        if (componentPayload && componentPayload.size) {
+            var size = componentPayload.size;
             if (size > 1024 * 1024) fileSize = (size / 1024 / 1024).toFixed(1) + ' MB';
             else if (size > 1024) fileSize = (size / 1024).toFixed(1) + ' KB';
             else fileSize = size + ' B';
@@ -213,7 +224,8 @@
             setTimeout(function () {
                 showFilePreview_{{ $jsId }}(value);
             }, 0);
-            window.__lastFileManagerPayload = selected;
+            // Store payload for this specific component
+            window['__lastFileManagerPayload_{{ $jsId }}'] = selected;
         });
     }
 
@@ -226,26 +238,34 @@
     document.addEventListener('DOMContentLoaded', function () {
         var inputEl = document.getElementById('{{ $getId() }}');
         if (inputEl && inputEl.value) {
-            showFilePreview_{{ $jsId }}(inputEl.value);
+            // Wait for the function to be available
+            const checkFunction = () => {
+                if (typeof window.showFilePreview_{{ $jsId }} === 'function') {
+                    window.showFilePreview_{{ $jsId }}(inputEl.value);
+                } else {
+                    setTimeout(checkFunction, 10);
+                }
+            };
+            checkFunction();
         }
     });
 
     // Handle selection via postMessage from popup/iframe
     window.addEventListener('message', function (event) {
-        var data = event && event.data ? event.data : null;
-        if (!data) return;
+            var data = event && event.data ? event.data : null;
+            if (!data) return;
         
-        var payload = null;
-        if (data.fileManagerSelected) {
-            payload = data.fileManagerSelected;
-        } else if (data.mceAction === 'fileSelected') {
-            payload = {url: data.url};
-        }
-        if (!payload) return;
+            var payload = null;
+            if (data.fileManagerSelected) {
+                payload = data.fileManagerSelected;
+            } else if (data.mceAction === 'fileSelected') {
+                payload = {url: data.url};
+            }
+            if (!payload) return;
         
         // Check if this message is for this specific component
-        var inputEl = document.getElementById('{{ $getId() }}');
-        if (!inputEl) return;
+            var inputEl = document.getElementById('{{ $getId() }}');
+            if (!inputEl) return;
         
         // Only process if this is the active component
         if (window.__currentFileManagerComponent === '{{ $jsId }}') {
@@ -258,7 +278,8 @@
             setTimeout(function () {
                 showFilePreview_{{ $jsId }}(value);
             }, 0);
-            window.__lastFileManagerPayload = payload;
+            // Store payload for this specific component
+            window['__lastFileManagerPayload_{{ $jsId }}'] = payload;
         }
     });
 
@@ -270,7 +291,15 @@
                     setTimeout(() => {
                         var inputEl = document.getElementById('{{ $getId() }}');
                         if (inputEl && inputEl.value) {
-                            showFilePreview_{{ $jsId }}(inputEl.value);
+                            // Wait for the function to be available
+                            const checkFunction = () => {
+                                if (typeof window.showFilePreview_{{ $jsId }} === 'function') {
+                                    window.showFilePreview_{{ $jsId }}(inputEl.value);
+                                } else {
+                                    setTimeout(checkFunction, 10);
+                                }
+                            };
+                            checkFunction();
                         }
                     }, 0);
                 });
@@ -282,7 +311,15 @@
     document.addEventListener('livewire:navigated', function () {
         var inputEl = document.getElementById('{{ $getId() }}');
         if (inputEl && inputEl.value) {
-            showFilePreview_{{ $jsId }}(inputEl.value);
+            // Wait for the function to be available
+            const checkFunction = () => {
+                if (typeof window.showFilePreview_{{ $jsId }} === 'function') {
+                    window.showFilePreview_{{ $jsId }}(inputEl.value);
+                } else {
+                    setTimeout(checkFunction, 10);
+                }
+            };
+            checkFunction();
         }
     });
 
@@ -389,6 +426,16 @@
                                     const ext = fileValue.split('.').pop().toLowerCase();
                                     const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
                                     
+                                    // Get file size from component-specific payload
+                                    let fileSize = '';
+                                    const componentPayload = window['__lastFileManagerPayload_' + jsId];
+                                    if (componentPayload && componentPayload.size) {
+                                        const size = componentPayload.size;
+                                        if (size > 1024 * 1024) fileSize = (size / 1024 / 1024).toFixed(1) + ' MB';
+                                        else if (size > 1024) fileSize = (size / 1024).toFixed(1) + ' KB';
+                                        else fileSize = size + ' B';
+                                    }
+                                    
                                     let body = '';
                                     if (imgExts.includes(ext)) {
                                         body = '<img src="' + url + '" style="display:block;margin:0 auto;max-width:100%;max-height:210px;">';
@@ -399,6 +446,7 @@
                                     const previewContent = '<div style="background:#222;border-radius:16px;box-shadow:0 4px 16px #0002;overflow:hidden;max-width:100%;position:relative;">' + 
                                         '<div style="background:linear-gradient(90deg,#1fa463,#1fa463 60%,#222 100%);color:#fff;padding:8px 16px 4px 8px;border-top-left-radius:14px;border-top-right-radius:14px;display:flex;align-items:center;justify-content:space-between;position:relative;">' +
                                         '<div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">' + fileName + '</div>' +
+                                        '<div style="font-size:13px;font-weight:400;opacity:0.9;">' + (fileSize ? fileSize : '') + '</div>' +
                                         '<button type="button" onclick="window.removeFilePreview_' + jsId + '()" style="background:none;border:none;top:0;right:14px;font-size:22px;color:#fff;cursor:pointer;">&times;</button>' +
                                         '</div>' +
                                         '<div style="padding:16px;">' + body + '</div>' +
@@ -438,7 +486,8 @@
                                     setTimeout(function () {
                                         window[previewFunctionName](value);
                                     }, 0);
-                                    window.__lastFileManagerPayload = selected;
+                                    // Store payload for this specific component
+                                    window['__lastFileManagerPayload_' + jsId] = selected;
                                 }
                             });
                         };
@@ -460,12 +509,88 @@
     });
 
     // Also call it after a short delay to ensure all components are loaded
-    setTimeout(window.__reinitializeFileManagerPickers, 500);
+    setTimeout(window.__reinitializeFileManagerPickers, 200);
     
-    // Additional delay for complex forms
-    setTimeout(window.__reinitializeFileManagerPickers, 1000);
-    
-    // Force re-initialization after a longer delay
-    setTimeout(window.__reinitializeFileManagerPickers, 2000);
+    // Force preview initialization for all components
+    setTimeout(function() {
+        const allInputs = document.querySelectorAll('input[id^="form."]');
+        
+        allInputs.forEach(input => {
+            if (input.value) {
+                const fieldId = input.id;
+                const jsId = fieldId.replace(/[.\[\]-]/g, '_');
+                const previewFunction = 'showFilePreview_' + jsId;
+                
+                if (typeof window[previewFunction] === 'function') {
+                    window[previewFunction](input.value);
+                } else {
+                    // Create the missing function dynamically
+                    window[previewFunction] = function(fileValue) {
+                        const previewEl = document.getElementById('file-preview-' + fieldId);
+                        const browseBtn = document.getElementById('browse-btn-' + fieldId);
+                        
+                        if (!fileValue) {
+                            if (previewEl) previewEl.innerHTML = '';
+                            if (browseBtn) browseBtn.style.display = '';
+                            return;
+                        }
+                        
+                        const isLikelyUrl = /^https?:\/\//i.test(fileValue) || fileValue.startsWith('/') || fileValue.startsWith('blob:');
+                        const url = isLikelyUrl ? fileValue : ('/filament-filemanager/file-preview/' + window.__ffm_base64url(fileValue));
+                        const fileName = fileValue.split('/').pop();
+                        const ext = fileValue.split('.').pop().toLowerCase();
+                        const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+                        
+                        // Get file size from component-specific payload
+                        let fileSize = '';
+                        const componentPayload = window['__lastFileManagerPayload_' + jsId];
+                        if (componentPayload && componentPayload.size) {
+                            const size = componentPayload.size;
+                            if (size > 1024 * 1024) fileSize = (size / 1024 / 1024).toFixed(1) + ' MB';
+                            else if (size > 1024) fileSize = (size / 1024).toFixed(1) + ' KB';
+                            else fileSize = size + ' B';
+                        }
+                        
+                        let body = '';
+                        if (imgExts.includes(ext)) {
+                            body = '<img src="' + url + '" style="display:block;margin:0 auto;max-width:100%;max-height:210px;">';
+                        } else {
+                            body = '<div style="padding:2rem;text-align:center;color:#888;">Previewing this file is not supported.</div>';
+                        }
+                        
+                        const previewContent = '<div style="background:#222;border-radius:16px;box-shadow:0 4px 16px #0002;overflow:hidden;max-width:100%;position:relative;">' + 
+                            '<div style="background:linear-gradient(90deg,#1fa463,#1fa463 60%,#222 100%);color:#fff;padding:8px 16px 4px 8px;border-top-left-radius:14px;border-top-right-radius:14px;display:flex;align-items:center;justify-content:space-between;position:relative;">' +
+                            '<div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">' + fileName + '</div>' +
+                            '<div style="font-size:13px;font-weight:400;opacity:0.9;">' + (fileSize ? fileSize : '') + '</div>' +
+                            '<button type="button" onclick="window.removeFilePreview_' + jsId + '()" style="background:none;border:none;top:0;right:14px;font-size:22px;color:#fff;cursor:pointer;">&times;</button>' +
+                            '</div>' +
+                            '<div style="padding:16px;">' + body + '</div>' +
+                            '</div>';
+                        
+                        if (previewEl) previewEl.innerHTML = previewContent;
+                        if (browseBtn) browseBtn.style.display = 'none';
+                    };
+                    
+                    // Also create the remove function
+                    const removeFunction = 'removeFilePreview_' + jsId;
+                    window[removeFunction] = function() {
+                        const inputEl = document.getElementById(fieldId);
+                        if (inputEl) {
+                            inputEl.value = '';
+                            inputEl.dispatchEvent(new Event('input', {bubbles: true}));
+                            inputEl.dispatchEvent(new Event('change', {bubbles: true}));
+                        }
+                        const previewEl = document.getElementById('file-preview-' + fieldId);
+                        if (previewEl) previewEl.innerHTML = '';
+                        const browseBtn = document.getElementById('browse-btn-' + fieldId);
+                        if (browseBtn) browseBtn.style.display = '';
+                    };
+                    
+                    // Now call the function
+                    window[previewFunction](input.value);
+                }
+            }
+        });
+    }, 500);
 </script>
 @endscript
