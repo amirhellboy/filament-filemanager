@@ -511,86 +511,66 @@
     // Also call it after a short delay to ensure all components are loaded
     setTimeout(window.__reinitializeFileManagerPickers, 200);
     
-    // Force preview initialization for all components
-    setTimeout(function() {
-        const allInputs = document.querySelectorAll('input[id^="form."]');
-        
-        allInputs.forEach(input => {
-            if (input.value) {
+    // Helper: initialize previews for all FileManager inputs on the page
+    if (!window.__ffm_initAllPreviews) {
+        window.__ffm_initAllPreviews = function () {
+            const allInputs = document.querySelectorAll('input[id^="form."][data-return]');
+            allInputs.forEach(input => {
+                if (!input.value) return;
                 const fieldId = input.id;
                 const jsId = fieldId.replace(/[.\[\]-]/g, '_');
                 const previewFunction = 'showFilePreview_' + jsId;
-                
+
                 if (typeof window[previewFunction] === 'function') {
                     window[previewFunction](input.value);
-                } else {
-                    // Create the missing function dynamically
-                    window[previewFunction] = function(fileValue) {
-                        const previewEl = document.getElementById('file-preview-' + fieldId);
-                        const browseBtn = document.getElementById('browse-btn-' + fieldId);
-                        
-                        if (!fileValue) {
-                            if (previewEl) previewEl.innerHTML = '';
-                            if (browseBtn) browseBtn.style.display = '';
-                            return;
-                        }
-                        
-                        const isLikelyUrl = /^https?:\/\//i.test(fileValue) || fileValue.startsWith('/') || fileValue.startsWith('blob:');
-                        const url = isLikelyUrl ? fileValue : ('/filament-filemanager/file-preview/' + window.__ffm_base64url(fileValue));
-                        const fileName = fileValue.split('/').pop();
-                        const ext = fileValue.split('.').pop().toLowerCase();
-                        const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-                        
-                        // Get file size from component-specific payload
-                        let fileSize = '';
-                        const componentPayload = window['__lastFileManagerPayload_' + jsId];
-                        if (componentPayload && componentPayload.size) {
-                            const size = componentPayload.size;
-                            if (size > 1024 * 1024) fileSize = (size / 1024 / 1024).toFixed(1) + ' MB';
-                            else if (size > 1024) fileSize = (size / 1024).toFixed(1) + ' KB';
-                            else fileSize = size + ' B';
-                        }
-                        
-                        let body = '';
-                        if (imgExts.includes(ext)) {
-                            body = '<img src="' + url + '" style="display:block;margin:0 auto;max-width:100%;max-height:210px;">';
-                        } else {
-                            body = '<div style="padding:2rem;text-align:center;color:#888;">Previewing this file is not supported.</div>';
-                        }
-                        
-                        const previewContent = '<div style="background:#222;border-radius:16px;box-shadow:0 4px 16px #0002;overflow:hidden;max-width:100%;position:relative;">' + 
-                            '<div style="background:linear-gradient(90deg,#1fa463,#1fa463 60%,#222 100%);color:#fff;padding:8px 16px 4px 8px;border-top-left-radius:14px;border-top-right-radius:14px;display:flex;align-items:center;justify-content:space-between;position:relative;">' +
-                            '<div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">' + fileName + '</div>' +
-                            '<div style="font-size:13px;font-weight:400;opacity:0.9;">' + (fileSize ? fileSize : '') + '</div>' +
-                            '<button type="button" onclick="window.removeFilePreview_' + jsId + '()" style="background:none;border:none;top:0;right:14px;font-size:22px;color:#fff;cursor:pointer;">&times;</button>' +
-                            '</div>' +
-                            '<div style="padding:16px;">' + body + '</div>' +
-                            '</div>';
-                        
-                        if (previewEl) previewEl.innerHTML = previewContent;
-                        if (browseBtn) browseBtn.style.display = 'none';
-                    };
-                    
-                    // Also create the remove function
-                    const removeFunction = 'removeFilePreview_' + jsId;
-                    window[removeFunction] = function() {
-                        const inputEl = document.getElementById(fieldId);
-                        if (inputEl) {
-                            inputEl.value = '';
-                            inputEl.dispatchEvent(new Event('input', {bubbles: true}));
-                            inputEl.dispatchEvent(new Event('change', {bubbles: true}));
-                        }
-                        const previewEl = document.getElementById('file-preview-' + fieldId);
-                        if (previewEl) previewEl.innerHTML = '';
-                        const browseBtn = document.getElementById('browse-btn-' + fieldId);
-                        if (browseBtn) browseBtn.style.display = '';
-                    };
-                    
-                    // Now call the function
-                    window[previewFunction](input.value);
+                    return;
                 }
-            }
-        });
-    }, 500);
+
+                // Minimal fallback preview if function missing
+                const previewEl = document.getElementById('file-preview-' + fieldId);
+                const browseBtn = document.getElementById('browse-btn-' + fieldId);
+                const isLikelyUrl = /^https?:\/\//i.test(input.value) || input.value.startsWith('/') || input.value.startsWith('blob:');
+                const url = isLikelyUrl ? input.value : ('/filament-filemanager/file-preview/' + (window.__ffm_base64url ? window.__ffm_base64url(input.value) : btoa(unescape(encodeURIComponent(input.value)))));
+                // Ensure remove function exists
+                const removeFunctionName = 'removeFilePreview_' + jsId;
+                if (typeof window[removeFunctionName] !== 'function') {
+                    window[removeFunctionName] = function () {
+                        const el = document.getElementById(fieldId);
+                        if (el) {
+                            el.value = '';
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        const p = document.getElementById('file-preview-' + fieldId);
+                        if (p) p.innerHTML = '';
+                        const b = document.getElementById('browse-btn-' + fieldId);
+                        if (b) b.style.display = '';
+                    };
+                }
+                const removeBtn = '<button type="button" onclick="window.' + removeFunctionName + '()" style="background:none;border:none;top:0;right:14px;font-size:22px;color:#fff;cursor:pointer;">&times;</button>';
+                const infoBar = '<div style="background:linear-gradient(90deg,#1fa463,#1fa463 60%,#222 100%);color:#fff;padding:8px 16px 4px 8px;display:flex;align-items:center;justify-content:space-between;position:relative;">'
+                    + '<div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;">' + (input.value.split('/').pop()) + '</div>'
+                    + removeBtn
+                    + '</div>';
+                const body = '<div style="padding:16px;"><img src="' + url + '" style="display:block;margin:0 auto;max-width:100%;max-height:210px;"></div>';
+                const fallback = '<div style="background:#222;border-radius:16px;box-shadow:0 4px 16px #0002;overflow:hidden;max-width:100%;position:relative;">'
+                    + infoBar + body + '</div>';
+                if (previewEl) previewEl.innerHTML = fallback;
+                if (browseBtn) browseBtn.style.display = 'none';
+            });
+        };
+    }
+
+    // Run after initial load and after Livewire/Filament updates
+    setTimeout(window.__ffm_initAllPreviews, 150);
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(window.__ffm_initAllPreviews, 50); });
+    document.addEventListener('livewire:navigated', function(){ setTimeout(window.__ffm_initAllPreviews, 20); });
+    document.addEventListener('filament:navigated', function(){ setTimeout(window.__ffm_initAllPreviews, 20); });
+    document.addEventListener('livewire:initialized', function(){ setTimeout(window.__ffm_initAllPreviews, 20); });
+    if (window.Livewire && window.Livewire.hook) {
+        try {
+            Livewire.hook('commit', ({ succeed }) => { succeed(() => setTimeout(window.__ffm_initAllPreviews, 0)); });
+        } catch (e) {}
+    }
 </script>
 @endscript
