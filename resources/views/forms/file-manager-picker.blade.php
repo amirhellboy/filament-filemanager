@@ -27,31 +27,30 @@
         x-on:livewire:navigated.window="init()"
     >
         <div id="file-preview-{{ $getId() }}" style="margin-bottom:1rem;width:100%"></div>
+        <script>
+            // Ensure modal function exists before any onclick executes (important for repeater add)
+            (function(){
+                var fnName = 'windowOpenFileManagerModal_{{ $jsId }}';
+                if (typeof window[fnName] !== 'function') {
+                    window[fnName] = function (onSelect) {
+                        const url = `{{ route("filament-filemanager.file-manager") }}`;
+                        const win = window.open(url, 'FileManager', 'width=900,height=600');
+                        const callbackId = '{{ $jsId }}';
+                        window.__fileManagerSelectCallback = (value) => {
+                            if (window.__currentFileManagerComponent === callbackId) {
+                                onSelect(value);
+                                win.close();
+                                delete window.__currentFileManagerComponent;
+                            }
+                        };
+                        window.__currentFileManagerComponent = callbackId;
+                    };
+                }
+            })();
+        </script>
         <button id="browse-btn-{{ $getId() }}" type="button" class="drag-drop-zone w-full"
                 style="width:100%;display:flex;align-items:center;justify-content:center;padding:2rem;font-size:1.2rem;"
-                onclick="(function() { 
-                    const func = window.openFileManagerPicker_{{ $jsId }} || window['openFileManagerPicker_{{ $jsId }}']; 
-                    if (func) { 
-                        func(); 
-                    } else { 
-                        // Try to create the function on the fly
-                        window.openFileManagerPicker_{{ $jsId }} = function () {
-                            windowOpenFileManagerModal_{{ $jsId }}(function (selected) {
-                                var inputEl = document.getElementById('{{ $getId() }}');
-                                var mode = (inputEl.getAttribute('data-return') || 'path').toLowerCase();
-                                var value = mode === 'url' ? (selected.url || selected.path || selected) : (selected.path || selected.url || selected);
-                                inputEl.value = value;
-                                inputEl.dispatchEvent(new Event('input', {bubbles: true}));
-                                inputEl.dispatchEvent(new Event('change', {bubbles: true}));
-                                setTimeout(function () {
-                                    showFilePreview_{{ $jsId }}(value);
-                                }, 0);
-                                window.__lastFileManagerPayload = selected;
-                            });
-                        };
-                        window.openFileManagerPicker_{{ $jsId }}();
-                    } 
-                })()"
+                x-on:click="(() => { let f = window['openFileManagerPicker_{{ $jsId }}']; if (typeof f === 'function') { f(); return; } if (window.__reinitializeFileManagerPickers) { window.__reinitializeFileManagerPickers(); f = window['openFileManagerPicker_{{ $jsId }}']; if (typeof f === 'function') { f(); return; } } const modal = 'windowOpenFileManagerModal_{{ $jsId }}'; if (typeof window[modal] !== 'function') { window[modal] = function(onSelect){ const url='{{ route('filament-filemanager.file-manager') }}'; const win=window.open(url,'FileManager','width=900,height=600'); const id='{{ $jsId }}'; window.__fileManagerSelectCallback=(v)=>{ if (window.__currentFileManagerComponent===id) { onSelect(v); win.close(); delete window.__currentFileManagerComponent; } }; window.__currentFileManagerComponent=id; }; } window[modal](function(selected){ const inputEl=document.getElementById('{{ $getId() }}'); const mode=(inputEl.getAttribute('data-return')||'path').toLowerCase(); const value=mode==='url'?(selected.url||selected.path||selected):(selected.path||selected.url||selected); inputEl.value=value; inputEl.dispatchEvent(new Event('input',{bubbles:true})); inputEl.dispatchEvent(new Event('change',{bubbles:true})); const prev=window['showFilePreview_{{ $jsId }}']; if (typeof prev==='function') { setTimeout(()=>prev(value),0); } }); })()"
                 @if($isDisabled()) disabled style="opacity:0.7;cursor:not-allowed;" @endif
         >
             @if(app()->getLocale() == "fa")
