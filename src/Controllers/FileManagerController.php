@@ -85,7 +85,7 @@ class FileManagerController
                         ]);
                         abort(500, 'File preview error: ' . $e->getMessage());
                     }
-                })->where('encodedPath', '.*')->name('filament-filemanager.file-preview');
+                })->where('encodedPath', '.*')->name('file-preview');
 
             });
     }

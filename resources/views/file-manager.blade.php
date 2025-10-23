@@ -530,7 +530,7 @@
                 const isImg = f._type === 'file' && imageExts.includes(f.ext);
                 const icon = f._type === 'dir'
                     ? `<span style="display:inline-flex;width:28px;height:28px;border-radius:4px;align-items:center;justify-content:center;margin-right:8px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="#1d4ed8" d="M10 4l2 2h6a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h4z"/></svg></span>`
-                    : (isImg ? `<img src="{{ route('filament-filemanager.file-preview', ['encodedPath' => '']) }}${base64url(f.path)}" style="width:28px;height:28px;object-fit:cover;border-radius:4px;margin-right:8px;">` : `<span style="display:inline-flex;width:28px;height:28px;border:1px solid #e5e7eb;border-radius:4px;align-items:center;justify-content:center;margin-right:8px;">📄</span>`);
+                    : (isImg ? `<img src="{{ url('/filament-filemanager/file-preview') }}/${base64url(f.path)}" style="width:28px;height:28px;object-fit:cover;border-radius:4px;margin-right:8px;">` : `<span style="display:inline-flex;width:28px;height:28px;border:1px solid #e5e7eb;border-radius:4px;align-items:center;justify-content:center;margin-right:8px;">📄</span>`);
                 const mid = base64Id(f.path);
                 tr.innerHTML = `
                         <td><input type=\"checkbox\" data-path=\"${f.path}\" ${selected.has(f.path) ? 'checked' : ''}></td>
@@ -568,7 +568,7 @@
                 const isImg = f._type === 'file' && imageExts.includes(f.ext);
                 const content = f._type === 'dir'
                     ? `<div class="thumb"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="96" height="72"><path fill="#1d4ed8" d="M10 4l2 2h6a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h4z"/></svg></div>`
-                    : (isImg ? `<img class="thumb" src="{{ route('filament-filemanager.file-preview', ['encodedPath' => '']) }}${base64url(f.path)}">` : `<div class="thumb"><span style="display:inline-flex;width:64px;height:64px;border:1px solid #e5e7eb;border-radius:8px;align-items:center;justify-content:center;">📄</span></div>`);
+                    : (isImg ? `<img class="thumb" src="{{ url('/filament-filemanager/file-preview') }}/${base64url(f.path)}">` : `<div class="thumb"><span style="display:inline-flex;width:64px;height:64px;border:1px solid #e5e7eb;border-radius:8px;align-items:center;justify-content:center;">📄</span></div>`);
                 card.innerHTML = `
                         ${content}
                         <div class="name">${f.name}</div>

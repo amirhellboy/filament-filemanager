@@ -164,7 +164,7 @@
             return;
         }
         var isLikelyUrl = /^https?:\/\//i.test(fileValue) || fileValue.startsWith('/') || fileValue.startsWith('blob:');
-        var url = isLikelyUrl ? fileValue : ('{{ route("filament-filemanager.file-preview", ["encodedPath" => "PLACEHOLDER"]) }}'.replace('PLACEHOLDER', window.__ffm_base64url(fileValue)));
+        var url = isLikelyUrl ? fileValue : ('{{ url("/filament-filemanager/file-preview") }}/' + window.__ffm_base64url(fileValue));
         var fileName = fileValue.split('/').pop();
         var ext = fileValue.split('.').pop().toLowerCase();
         var imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
@@ -420,7 +420,7 @@
                                     }
                                     
                                     const isLikelyUrl = /^https?:\/\//i.test(fileValue) || fileValue.startsWith('/') || fileValue.startsWith('blob:');
-                                    const url = isLikelyUrl ? fileValue : ('{{ route("filament-filemanager.file-preview", ["encodedPath" => "PLACEHOLDER"]) }}'.replace('PLACEHOLDER', window.__ffm_base64url(fileValue)));
+                                    const url = isLikelyUrl ? fileValue : ('{{ url("/filament-filemanager/file-preview") }}/' + window.__ffm_base64url(fileValue));
                                     const fileName = fileValue.split('/').pop();
                                     const ext = fileValue.split('.').pop().toLowerCase();
                                     const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
@@ -529,7 +529,7 @@
                 const previewEl = document.getElementById('file-preview-' + fieldId);
                 const browseBtn = document.getElementById('browse-btn-' + fieldId);
                 const isLikelyUrl = /^https?:\/\//i.test(input.value) || input.value.startsWith('/') || input.value.startsWith('blob:');
-                const url = isLikelyUrl ? input.value : ('{{ route("filament-filemanager.file-preview", ["encodedPath" => "PLACEHOLDER"]) }}'.replace('PLACEHOLDER', (window.__ffm_base64url ? window.__ffm_base64url(input.value) : btoa(unescape(encodeURIComponent(input.value))))));
+                const url = isLikelyUrl ? input.value : ('{{ url("/filament-filemanager/file-preview") }}/' + (window.__ffm_base64url ? window.__ffm_base64url(input.value) : btoa(unescape(encodeURIComponent(input.value)))));
                 // Ensure remove function exists
                 const removeFunctionName = 'removeFilePreview_' + jsId;
                 if (typeof window[removeFunctionName] !== 'function') {
